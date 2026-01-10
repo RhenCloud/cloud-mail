@@ -309,6 +309,14 @@ const zh = {
     character: '位',
     mustNotContain: '禁止包含',
     mustNotContainDesc: '输入多个值用,分开',
-    setSuccess: '设置成功'
+    setSuccess: '设置成功',
+    configuration: '配置',
+    smtpDomainPlaceholder: '域名，例如 example.com',
+    smtpHostPlaceholder: 'SMTP 服务器地址',
+    smtpPortPlaceholder: '端口，例如 587 或 465',
+    smtpSecure: '使用 TLS (端口 465)',
+    smtpStartTls: '启动 StartTLS (升级为 TLS)',
+    smtpUsername: '用户名',
+    smtpPassword: '密码'
 }
 export default zh

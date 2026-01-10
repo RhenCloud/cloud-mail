@@ -517,23 +517,39 @@
         </form>
       </el-dialog>
 
-      <el-dialog v-model="smtpFormShow" :title="'SMTP ' + $t('configuration')" width="480" @closed="cleanSmtpForm">
+      <el-dialog v-model="smtpFormShow" :title="'SMTP ' + $t('configuration')" width="520" @closed="cleanSmtpForm">
         <form>
-          <el-input style="margin-bottom: 10px" v-model="smtpForm.domain" placeholder="Domain (example.com)" />
-          <el-input style="margin-bottom: 10px" v-model="smtpForm.host" placeholder="SMTP Host" />
-          <el-input style="margin-bottom: 10px" v-model="smtpForm.port" placeholder="Port" />
-          <el-switch style="margin-bottom: 10px" v-model="smtpForm.secure" :active-value="true" :inactive-value="false"
-            >Secure (TLS)</el-switch
-          >
-          <el-switch
+          <el-input style="margin-bottom: 10px" v-model="smtpForm.domain" :placeholder="$t('smtpDomainPlaceholder')" />
+          <el-input style="margin-bottom: 10px" v-model="smtpForm.host" :placeholder="$t('smtpHostPlaceholder')" />
+          <el-input style="margin-bottom: 10px" v-model="smtpForm.port" :placeholder="$t('smtpPortPlaceholder')" />
+
+          <div style="display: flex; gap: 12px; align-items: center; margin-bottom: 10px">
+            <div style="display: flex; align-items: center; gap: 6px">
+              <el-switch v-model="smtpForm.secure" :active-value="true" :inactive-value="false" />
+              <div style="font-size: 13px">{{ $t("smtpSecure") }}</div>
+            </div>
+            <el-tooltip effect="dark" :content="$t('smtpSecure')">
+              <i class="el-icon-info" style="margin-left: 6px; color: var(--el-color-primary)"></i>
+            </el-tooltip>
+
+            <div style="display: flex; align-items: center; gap: 6px; margin-left: 10px">
+              <el-switch v-model="smtpForm.startTls" :active-value="true" :inactive-value="false" />
+              <div style="font-size: 13px">{{ $t("smtpStartTls") }}</div>
+            </div>
+          </div>
+
+          <el-input
             style="margin-bottom: 10px"
-            v-model="smtpForm.startTls"
-            :active-value="true"
-            :inactive-value="false"
-            >StartTLS</el-switch
-          >
-          <el-input style="margin-bottom: 10px" v-model="smtpForm.credentials.username" placeholder="Username" />
-          <el-input style="margin-bottom: 10px" v-model="smtpForm.credentials.password" placeholder="Password" />
+            v-model="smtpForm.credentials.username"
+            :placeholder="$t('smtpUsername')"
+          />
+          <el-input
+            style="margin-bottom: 10px"
+            v-model="smtpForm.credentials.password"
+            :placeholder="$t('smtpPassword')"
+            show-password
+          />
+
           <div style="display: flex; gap: 8px; justify-content: flex-end">
             <el-button type="primary" :loading="settingLoading" @click="saveSmtp">{{ $t("save") }}</el-button>
           </div>
