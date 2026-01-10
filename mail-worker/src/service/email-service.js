@@ -8,6 +8,8 @@ import accountService from './account-service';
 import BizError from '../error/biz-error';
 import emailUtils from '../utils/email-utils';
 import { Resend } from 'resend';
+import { WorkerMailer } from 'worker-mailer';
+import { v4 as uuidv4 } from 'uuid';
 import attService from './att-service';
 import { parseHTML } from 'linkedom';
 import userService from './user-service';
@@ -168,7 +170,7 @@ const emailService = {
 			attachments
 		} = params;
 
-		const { resendTokens, r2Domain, send } = await settingService.query(c);
+		const { resendTokens, r2Domain, send, smtpConfigs: settingSmtpConfigs } = await settingService.query(c);
 
 		let { imageDataList, html } = await attService.toImageUrlHtml(c, content);
 
@@ -248,20 +250,115 @@ const emailService = {
 
 		let resendResult = null;
 
-		const resend = new Resend(resendToken);
+		// 先检查是否配置了 SMTP：优先取 setting 中的 smtpConfigs，然后回退到环境变量 `SMTP_CONFIG` 或 `smtpConfigs`
+		let smtpConfigs = settingSmtpConfigs || {};
+		if (!smtpConfigs || Object.keys(smtpConfigs).length === 0) {
+			const smtpEnv = c.env.SMTP_CONFIG || c.env.smtpConfigs;
+			if (smtpEnv) {
+				try {
+					smtpConfigs = typeof smtpEnv === 'string' ? JSON.parse(smtpEnv) : smtpEnv;
+				} catch (e) {
+					smtpConfigs = {};
+				}
+			}
+		}
 
-		//如果是分开发送
-		if (manyType === 'divide') {
+		const smtpConfig = smtpConfigs[domain];
 
-			let sendFormList = [];
+		if (smtpConfig) {
+			// 使用 worker-mailer 发送
+			try {
+				if (manyType === 'divide') {
+					const results = [];
+					for (const rEmail of receiveEmail) {
+						const mailOptions = {
+							from: { name: name, email: accountRow.email },
+							to: { email: rEmail },
+							subject: subject,
+							text: text,
+							html: html,
+							attachments: [
+								...imageDataList.map(item => ({ filename: item.filename, content: item.content, type: item.mimeType || item.contentType })),
+								...attachments.map(att => ({ filename: att.filename, content: att.content, type: att.type }))
+							]
+						};
 
-			receiveEmail.forEach(email => {
+						if (sendType === 'reply') {
+							mailOptions.headers = {
+								'in-reply-to': emailRow.messageId,
+								'references': emailRow.messageId
+							};
+						}
+
+						await WorkerMailer.send(smtpConfig, mailOptions);
+						results.push({ id: uuidv4() });
+					}
+
+					resendResult = { data: { data: results } };
+				} else {
+					const mailOptions = {
+						from: { name: name, email: accountRow.email },
+						to: receiveEmail.length === 1 ? receiveEmail[0] : receiveEmail,
+						subject: subject,
+						text: text,
+						html: html,
+						attachments: [
+							...imageDataList.map(item => ({ filename: item.filename, content: item.content, type: item.mimeType || item.contentType })),
+							...attachments.map(att => ({ filename: att.filename, content: att.content, type: att.type }))
+						]
+					};
+
+					if (sendType === 'reply') {
+						mailOptions.headers = {
+							'in-reply-to': emailRow.messageId,
+							'references': emailRow.messageId
+						};
+					}
+
+					await WorkerMailer.send(smtpConfig, mailOptions);
+					resendResult = { data: { id: uuidv4() } };
+				}
+			} catch (e) {
+				throw new BizError(e.message || 'smtp send error');
+			}
+		} else {
+			const resend = new Resend(resendToken);
+
+			//如果是分开发送
+			if (manyType === 'divide') {
+
+				let sendFormList = [];
+
+				receiveEmail.forEach(email => {
+					const sendForm = {
+						from: `${name} <${accountRow.email}>`,
+						to: [email],
+						subject: subject,
+						text: text,
+						html: html
+					};
+
+					if (sendType === 'reply') {
+						sendForm.headers = {
+							'in-reply-to': emailRow.messageId,
+							'references': emailRow.messageId
+						};
+					}
+
+					sendFormList.push(sendForm);
+				});
+
+				resendResult = await resend.batch.send(sendFormList);
+
+			} else {
+
 				const sendForm = {
 					from: `${name} <${accountRow.email}>`,
-					to: [email],
+					to: [...receiveEmail],
 					subject: subject,
 					text: text,
-					html: html
+					html: html,
+					attachments: [...imageDataList, ...attachments]
 				};
 
 				if (sendType === 'reply') {
@@ -271,31 +368,9 @@ const emailService = {
 					};
 				}
 
-				sendFormList.push(sendForm);
-			});
+				resendResult = await resend.emails.send(sendForm);
 
-			resendResult = await resend.batch.send(sendFormList);
-
-		} else {
-
-			const sendForm = {
-				from: `${name} <${accountRow.email}>`,
-				to: [...receiveEmail],
-				subject: subject,
-				text: text,
-				html: html,
-				attachments: [...imageDataList, ...attachments]
-			};
-
-			if (sendType === 'reply') {
-				sendForm.headers = {
-					'in-reply-to': emailRow.messageId,
-					'references': emailRow.messageId
-				};
 			}
-
-			resendResult = await resend.emails.send(sendForm);
-
 		}
 
 		const { data, error } = resendResult;

@@ -13,7 +13,8 @@ const settingService = {
 
 	async refresh(c) {
 		const settingRow = await orm(c).select().from(setting).get();
-		settingRow.resendTokens = JSON.parse(settingRow.resendTokens);
+		settingRow.resendTokens = JSON.parse(settingRow.resendTokens || '{}');
+		settingRow.smtpConfigs = JSON.parse(settingRow.smtpConfigs || '{}');
 		c.set('setting', settingRow);
 		await c.env.kv.put(KvConst.SETTING, JSON.stringify(settingRow));
 	},
@@ -60,6 +61,19 @@ const settingService = {
 
 		setting.emailPrefixFilter = setting.emailPrefixFilter.split(",").filter(Boolean);
 
+		// ensure objects
+		try {
+			setting.resendTokens = typeof setting.resendTokens === 'string' ? JSON.parse(setting.resendTokens) : (setting.resendTokens || {});
+		} catch (e) {
+			setting.resendTokens = {};
+		}
+
+		try {
+			setting.smtpConfigs = typeof setting.smtpConfigs === 'string' ? JSON.parse(setting.smtpConfigs) : (setting.smtpConfigs || {});
+		} catch (e) {
+			setting.smtpConfigs = {};
+		}
+
 		c.set?.('setting', setting);
 		return setting;
 	},
@@ -78,8 +92,21 @@ const settingService = {
 
 		settingRow.secretKey = settingRow.secretKey ? `${settingRow.secretKey.slice(0, 12)}******` : null;
 
-		Object.keys(settingRow.resendTokens).forEach(key => {
+		Object.keys(settingRow.resendTokens || {}).forEach(key => {
 			settingRow.resendTokens[key] = `${settingRow.resendTokens[key].slice(0, 12)}******`;
+		});
+
+		// mask smtp credential password
+		Object.keys(settingRow.smtpConfigs || {}).forEach(key => {
+			const cfg = settingRow.smtpConfigs[key];
+			if (cfg && cfg.credentials) {
+				const u = cfg.credentials.username || '';
+				const p = cfg.credentials.password || '';
+				settingRow.smtpConfigs[key].credentials = {
+					username: u ? `${u.slice(0, 4)}******` : '',
+					password: p ? `${p.slice(0, 4)}******` : ''
+				}
+			}
 		});
 
 		settingRow.s3AccessKey = settingRow.s3AccessKey ? `${settingRow.s3AccessKey.slice(0, 12)}******` : null;
@@ -113,11 +140,17 @@ const settingService = {
 			if (!resendTokens[domain]) delete resendTokens[domain];
 		});
 
+		let smtpConfigs = { ...settingData.smtpConfigs, ...params.smtpConfigs };
+		Object.keys(smtpConfigs).forEach(domain => {
+			if (!smtpConfigs[domain]) delete smtpConfigs[domain];
+		});
+
 		if (Array.isArray(params.emailPrefixFilter)) {
 			params.emailPrefixFilter = params.emailPrefixFilter + '';
 		}
 
 		params.resendTokens = JSON.stringify(resendTokens);
+		params.smtpConfigs = JSON.stringify(smtpConfigs);
 		await orm(c).update(setting).set({ ...params }).returning().get();
 		await this.refresh(c);
 	},
