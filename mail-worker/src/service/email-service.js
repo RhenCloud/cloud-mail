@@ -347,10 +347,10 @@ const emailService = {
 							text: text,
 							html: html,
 							authType: finalSmtpConfig.authType || "plain",
-							attachments: [
-								...imageDataList.map(item => ({ filename: item.filename, content: item.content, type: item.mimeType || item.contentType })),
-								...attachments.map(att => ({ filename: att.filename, content: att.content, type: att.type }))
-							]
+								attachments: [
+									...imageDataList.map(item => ({ filename: item.filename, content: toBase64String(item.content), type: item.mimeType || item.contentType })),
+									...attachments.map(att => ({ filename: att.filename, content: toBase64String(att.content), type: att.type }))
+								]
 						};
 
 						if (sendType === 'reply') {
@@ -359,8 +359,6 @@ const emailService = {
 								'references': emailRow.messageId
 							};
 						}
-								...imageDataList.map(item => ({ filename: item.filename, content: toBase64String(item.content), type: item.mimeType || item.contentType })),
-								...attachments.map(att => ({ filename: att.filename, content: toBase64String(att.content), type: att.type }))
 						results.push({ id: uuidv4() });
 					}
 
@@ -373,8 +371,8 @@ const emailService = {
 						text: text,
 						html: html,
 						attachments: [
-							...imageDataList.map(item => ({ filename: item.filename, content: item.content, type: item.mimeType || item.contentType })),
-							...attachments.map(att => ({ filename: att.filename, content: att.content, type: att.type }))
+								...imageDataList.map(item => ({ filename: item.filename, content: toBase64String(item.content), type: item.mimeType || item.contentType })),
+								...attachments.map(att => ({ filename: att.filename, content: toBase64String(att.content), type: att.type }))
 						]
 					};
 
@@ -384,10 +382,8 @@ const emailService = {
 							'references': emailRow.messageId
 						};
 					}
-							...imageDataList.map(item => ({ filename: item.filename, content: toBase64String(item.content), type: item.mimeType || item.contentType })),
-							...attachments.map(att => ({ filename: att.filename, content: toBase64String(att.content), type: att.type }))
-					mailOptions.authType = mailOptions.authType || finalSmtpConfig.authType || 'plain';
-					await trySendWithFallback(finalSmtpConfig, mailOptions);
+						mailOptions.authType = mailOptions.authType || finalSmtpConfig.authType || 'plain';
+						await trySendWithFallback(finalSmtpConfig, mailOptions);
 					resendResult = { data: { id: uuidv4() } };
 				}
 				} catch (e) {
