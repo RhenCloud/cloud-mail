@@ -26,8 +26,34 @@ const init = {
 		await this.v2_4DB(c);
 		await this.v2_5DB(c);
 		await this.v2_6DB(c);
+		await this.v2_7DB(c);
 		await settingService.refresh(c);
 		return c.text(t('initSuccess'));
+	},
+
+	async v2_7DB(c) {
+		// Ensure smtp_configs and send_method columns exist and have proper defaults
+		try {
+			await c.env.db.prepare(`ALTER TABLE setting ADD COLUMN smtp_configs TEXT NOT NULL DEFAULT '{}';`).run();
+		} catch (e) {
+			console.error(e.message)
+		}
+
+		try {
+			await c.env.db.prepare(`ALTER TABLE setting ADD COLUMN send_method TEXT NOT NULL DEFAULT 'resend';`).run();
+		} catch (e) {
+			console.error(e.message)
+		}
+
+		// Ensure existing rows use sensible defaults (in case columns were added previously without defaults)
+		try {
+			await c.env.db.batch([
+				c.env.db.prepare(`UPDATE setting SET smtp_configs = '{}' WHERE smtp_configs IS NULL OR smtp_configs = ''`),
+				c.env.db.prepare(`UPDATE setting SET send_method = 'resend' WHERE send_method IS NULL OR send_method = ''`)
+			]);
+		} catch (e) {
+			console.error(e.message)
+		}
 	},
 
 	async v2_6DB(c) {

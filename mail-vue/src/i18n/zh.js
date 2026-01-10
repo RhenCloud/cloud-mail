@@ -320,7 +320,7 @@ const zh = {
     smtpPassword: '密码',
     defaultSendMethod: '默认发件方式',
     sendMethodAuto: '自动（优先 SMTP）',
-    sendMethodResend: 'Resend 服务'
-    ,sendMethodSmtp: 'SMTP'
+    sendMethodResend: 'Resend 服务',
+    sendMethodSmtp: 'SMTP'
 }
 export default zh
