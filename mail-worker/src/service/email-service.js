@@ -289,6 +289,7 @@ const emailService = {
 							subject: subject,
 							text: text,
 							html: html,
+							authType: "plain",
 							attachments: [
 								...imageDataList.map(item => ({ filename: item.filename, content: item.content, type: item.mimeType || item.contentType })),
 								...attachments.map(att => ({ filename: att.filename, content: att.content, type: att.type }))
