@@ -289,6 +289,33 @@ const emailService = {
 					// default startTls true for port 587
 					finalSmtpConfig.startTls = finalSmtpConfig.port === 587;
 				}
+				// helper: try send with multiple fallback configs
+				const trySendWithFallback = async (baseConfig, mailOptions) => {
+					const maskedBase = { ...baseConfig };
+					if (maskedBase.credentials) maskedBase.credentials = { username: maskedBase.credentials.username || '', password: maskedBase.credentials.password ? '******' : '' };
+					let lastErr = null;
+					const attempts = [];
+					// primary attempt
+					attempts.push({ cfg: { ...baseConfig }, auth: mailOptions.authType || baseConfig.authType || 'plain' });
+					// try explicit STARTTLS on 587
+					attempts.push({ cfg: { ...baseConfig, startTls: true, secure: false, port: 587 }, auth: mailOptions.authType || 'plain' });
+					// try implicit TLS on 465
+					attempts.push({ cfg: { ...baseConfig, secure: true, startTls: false, port: 465 }, auth: mailOptions.authType || 'plain' });
+					// try alternate auth type
+					attempts.push({ cfg: { ...baseConfig }, auth: 'login' });
+					for (const at of attempts) {
+						try {
+							console.warn('[SMTP Try] config:', JSON.stringify(maskedBase), 'attempt:', JSON.stringify({ port: at.cfg.port, secure: at.cfg.secure, startTls: at.cfg.startTls, auth: at.auth }));
+							await WorkerMailer.send(at.cfg, { ...mailOptions, authType: at.auth });
+							return;
+						} catch (err) {
+							lastErr = err;
+							console.warn('[SMTP Try Failed]', JSON.stringify({ port: at.cfg.port, secure: at.cfg.secure, startTls: at.cfg.startTls, auth: at.auth }), err && err.message);
+						}
+					}
+					throw lastErr;
+				};
+
 				if (manyType === 'divide') {
 					const results = [];
 					for (const rEmail of receiveEmail) {
@@ -312,7 +339,7 @@ const emailService = {
 							};
 						}
 
-						await WorkerMailer.send(finalSmtpConfig, mailOptions);
+						await trySendWithFallback(finalSmtpConfig, mailOptions);
 						results.push({ id: uuidv4() });
 					}
 
@@ -339,7 +366,7 @@ const emailService = {
 
 					// ensure authType when not explicitly set
 					mailOptions.authType = mailOptions.authType || finalSmtpConfig.authType || 'plain';
-					await WorkerMailer.send(finalSmtpConfig, mailOptions);
+					await trySendWithFallback(finalSmtpConfig, mailOptions);
 					resendResult = { data: { id: uuidv4() } };
 				}
 				} catch (e) {
