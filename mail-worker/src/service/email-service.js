@@ -23,6 +23,27 @@ import r2Service from './r2-service';
 import domainUtils from '../utils/domain-uitls';
 import account from "../entity/account";
 
+// helper: ensure attachment content is base64 string when possible
+const toBase64String = (content) => {
+	if (!content) return content;
+	if (typeof content === 'string') return content;
+	try {
+		if (typeof Buffer !== 'undefined' && Buffer.isBuffer(content)) {
+			return Buffer.from(content).toString('base64');
+		}
+	} catch (e) {}
+	// Uint8Array or ArrayBuffer
+	try {
+		if (content instanceof Uint8Array) {
+			return Buffer.from(content).toString('base64');
+		}
+		if (content instanceof ArrayBuffer) {
+			return Buffer.from(new Uint8Array(content)).toString('base64');
+		}
+	} catch (e) {}
+	return content;
+}
+
 const emailService = {
 
 	async list(c, params, userId) {
@@ -296,21 +317,21 @@ const emailService = {
 					let lastErr = null;
 					const attempts = [];
 					// primary attempt
-					attempts.push({ cfg: { ...baseConfig }, auth: mailOptions.authType || baseConfig.authType || 'plain' });
+					attempts.push({ cfg: { ...baseConfig } });
 					// try explicit STARTTLS on 587
-					attempts.push({ cfg: { ...baseConfig, startTls: true, secure: false, port: 587 }, auth: mailOptions.authType || 'plain' });
+					attempts.push({ cfg: { ...baseConfig, startTls: true, secure: false, port: 587 } });
 					// try implicit TLS on 465
-					attempts.push({ cfg: { ...baseConfig, secure: true, startTls: false, port: 465 }, auth: mailOptions.authType || 'plain' });
+					attempts.push({ cfg: { ...baseConfig, secure: true, startTls: false, port: 465 } });
 					// try alternate auth type
-					attempts.push({ cfg: { ...baseConfig }, auth: 'login' });
+					attempts.push({ cfg: { ...baseConfig }  });
 					for (const at of attempts) {
 						try {
-							console.warn('[SMTP Try] config:', JSON.stringify(maskedBase), 'attempt:', JSON.stringify({ port: at.cfg.port, secure: at.cfg.secure, startTls: at.cfg.startTls, auth: at.auth }));
-							await WorkerMailer.send(at.cfg, { ...mailOptions, authType: at.auth });
+							console.warn('[SMTP Try] config:', JSON.stringify(maskedBase), 'attempt:', JSON.stringify({ port: at.cfg.port, secure: at.cfg.secure, startTls: at.cfg.startTls }));
+							await WorkerMailer.send(at.cfg, { ...mailOptions});
 							return;
 						} catch (err) {
 							lastErr = err;
-							console.warn('[SMTP Try Failed]', JSON.stringify({ port: at.cfg.port, secure: at.cfg.secure, startTls: at.cfg.startTls, auth: at.auth }), err && err.message);
+							console.warn('[SMTP Try Failed]', JSON.stringify({ port: at.cfg.port, secure: at.cfg.secure, startTls: at.cfg.startTls }), err && err.message);
 						}
 					}
 					throw lastErr;
@@ -338,8 +359,8 @@ const emailService = {
 								'references': emailRow.messageId
 							};
 						}
-
-						await trySendWithFallback(finalSmtpConfig, mailOptions);
+								...imageDataList.map(item => ({ filename: item.filename, content: toBase64String(item.content), type: item.mimeType || item.contentType })),
+								...attachments.map(att => ({ filename: att.filename, content: toBase64String(att.content), type: att.type }))
 						results.push({ id: uuidv4() });
 					}
 
@@ -363,8 +384,8 @@ const emailService = {
 							'references': emailRow.messageId
 						};
 					}
-
-					// ensure authType when not explicitly set
+							...imageDataList.map(item => ({ filename: item.filename, content: toBase64String(item.content), type: item.mimeType || item.contentType })),
+							...attachments.map(att => ({ filename: att.filename, content: toBase64String(att.content), type: att.type }))
 					mailOptions.authType = mailOptions.authType || finalSmtpConfig.authType || 'plain';
 					await trySendWithFallback(finalSmtpConfig, mailOptions);
 					resendResult = { data: { id: uuidv4() } };
