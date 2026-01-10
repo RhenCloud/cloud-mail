@@ -280,6 +280,15 @@ const emailService = {
 		if (useSmtp && smtpConfig) {
 			// 使用 worker-mailer 发送
 			try {
+				// normalize smtpConfig defaults
+				const finalSmtpConfig = { ...(smtpConfig || {}) };
+				if (finalSmtpConfig.port === undefined && finalSmtpConfig.secure) {
+					finalSmtpConfig.port = finalSmtpConfig.secure ? 465 : 587;
+				}
+				if (finalSmtpConfig.startTls === undefined) {
+					// default startTls true for port 587
+					finalSmtpConfig.startTls = finalSmtpConfig.port === 587;
+				}
 				if (manyType === 'divide') {
 					const results = [];
 					for (const rEmail of receiveEmail) {
@@ -289,7 +298,7 @@ const emailService = {
 							subject: subject,
 							text: text,
 							html: html,
-							authType: "plain",
+							authType: finalSmtpConfig.authType || "plain",
 							attachments: [
 								...imageDataList.map(item => ({ filename: item.filename, content: item.content, type: item.mimeType || item.contentType })),
 								...attachments.map(att => ({ filename: att.filename, content: att.content, type: att.type }))
@@ -303,7 +312,7 @@ const emailService = {
 							};
 						}
 
-						await WorkerMailer.send(smtpConfig, mailOptions);
+						await WorkerMailer.send(finalSmtpConfig, mailOptions);
 						results.push({ id: uuidv4() });
 					}
 
@@ -328,12 +337,20 @@ const emailService = {
 						};
 					}
 
-					await WorkerMailer.send(smtpConfig, mailOptions);
+					// ensure authType when not explicitly set
+					mailOptions.authType = mailOptions.authType || finalSmtpConfig.authType || 'plain';
+					await WorkerMailer.send(finalSmtpConfig, mailOptions);
 					resendResult = { data: { id: uuidv4() } };
 				}
-			} catch (e) {
-				throw new BizError(e.message || 'smtp send error');
-			}
+				} catch (e) {
+					// mask credentials for logging
+					const masked = { ...finalSmtpConfig };
+					if (masked.credentials) {
+						masked.credentials = { username: masked.credentials.username || '', password: masked.credentials.password ? '******' : '' };
+					}
+					console.error('[SMTP Error] config:', JSON.stringify(masked), 'error:', e);
+					throw new BizError(e.message || 'smtp send error');
+				}
 		} else {
 			const resend = new Resend(resendToken);
 
