@@ -16,6 +16,7 @@
         "resend": "^6.4.1",
         "ua-parser-js": "^2.0.3",
         "uuid": "^11.1.0",
+        "worker-mailer": "^1.2.1",
       },
       "devDependencies": {
         "@cloudflare/vitest-pool-workers": "^0.7.5",
@@ -716,6 +717,8 @@
     "whatwg-url": ["whatwg-url@5.0.0", "https://npmreg.proxy.ustclug.org/whatwg-url/-/whatwg-url-5.0.0.tgz", { "dependencies": { "tr46": "0.0.3", "webidl-conversions": "3.0.1" } }, "sha512-saE57nupxk6v3HY35+jzBwYa0rKSy0XR8JSxZPwgLr7ys0IBzhGviA1/TUGJLmSVqs8pb9AnvICXEuOHLprYTw=="],
 
     "why-is-node-running": ["why-is-node-running@2.3.0", "https://npmreg.proxy.ustclug.org/why-is-node-running/-/why-is-node-running-2.3.0.tgz", { "dependencies": { "siginfo": "2.0.0", "stackback": "0.0.2" }, "bin": { "why-is-node-running": "cli.js" } }, "sha512-hUrmaWBdVDcxvYqnyh09zunKzROWjbZTiNy8dBEjkS7ehEDQibXJ7XvlmtbwuTclUiIyN+CyXQD4Vmko8fNm8w=="],
+
+    "worker-mailer": ["worker-mailer@1.2.1", "", {}, "sha512-gS2ei/mrpRqNs+AHmqxhT6vFPwCLw2qnz5ShmyGD0ULaU0Q9hxnFAcx9jhAip/MnD6+MjgnQu6hQQgA8mlOkVA=="],
 
     "workerd": ["workerd@1.20250823.0", "https://npmreg.proxy.ustclug.org/workerd/-/workerd-1.20250823.0.tgz", { "optionalDependencies": { "@cloudflare/workerd-darwin-64": "1.20250823.0", "@cloudflare/workerd-darwin-arm64": "1.20250823.0", "@cloudflare/workerd-linux-64": "1.20250823.0", "@cloudflare/workerd-linux-arm64": "1.20250823.0", "@cloudflare/workerd-windows-64": "1.20250823.0" }, "bin": { "workerd": "bin/workerd" } }, "sha512-95lToK9zeaC7bX5ZmlP/wz6zqoUPBk3hhec1JjEMGZrxsXY9cPRkjWNCcjDctQ17U97vjMcY/ymchgx7w8Cfmg=="],
 
