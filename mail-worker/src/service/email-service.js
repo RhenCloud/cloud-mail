@@ -279,10 +279,10 @@ const emailService = {
 
 		if (useSmtp && smtpConfig) {
 			// 使用 worker-mailer 发送
+			let finalSmtpConfig = { ...(smtpConfig || {}) };
 			try {
 				// normalize smtpConfig defaults
-				const finalSmtpConfig = { ...(smtpConfig || {}) };
-				if (finalSmtpConfig.port === undefined && finalSmtpConfig.secure) {
+				if (finalSmtpConfig.port === undefined && finalSmtpConfig.secure !== undefined) {
 					finalSmtpConfig.port = finalSmtpConfig.secure ? 465 : 587;
 				}
 				if (finalSmtpConfig.startTls === undefined) {
