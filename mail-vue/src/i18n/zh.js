@@ -317,6 +317,10 @@ const zh = {
     smtpSecure: '使用 TLS (端口 465)',
     smtpStartTls: '启动 StartTLS (升级为 TLS)',
     smtpUsername: '用户名',
-    smtpPassword: '密码'
+    smtpPassword: '密码',
+    defaultSendMethod: '默认发件方式',
+    sendMethodAuto: '自动（优先 SMTP）',
+    sendMethodResend: 'Resend 服务'
+    ,sendMethodSmtp: 'SMTP'
 }
 export default zh

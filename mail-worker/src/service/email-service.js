@@ -170,7 +170,7 @@ const emailService = {
 			attachments
 		} = params;
 
-		const { resendTokens, r2Domain, send, smtpConfigs: settingSmtpConfigs } = await settingService.query(c);
+		const { resendTokens, r2Domain, send, smtpConfigs: settingSmtpConfigs, sendMethod } = await settingService.query(c);
 
 		let { imageDataList, html } = await attService.toImageUrlHtml(c, content);
 
@@ -265,7 +265,19 @@ const emailService = {
 
 		const smtpConfig = smtpConfigs[domain];
 
-		if (smtpConfig) {
+		// 决定使用哪种发送方式：优先级由 sendMethod 决定
+		// sendMethod: 'smtp' | 'resend' | 'auto'
+		let useSmtp = false;
+		if (sendMethod === 'smtp') {
+			useSmtp = !!smtpConfig;
+		} else if (sendMethod === 'resend') {
+			useSmtp = false;
+		} else {
+			// auto or undefined: prefer smtp when available
+			useSmtp = !!smtpConfig;
+		}
+
+		if (useSmtp && smtpConfig) {
 			// 使用 worker-mailer 发送
 			try {
 				if (manyType === 'divide') {

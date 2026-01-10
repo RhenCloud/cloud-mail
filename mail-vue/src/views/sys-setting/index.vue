@@ -216,6 +216,18 @@
               </div>
               <div class="setting-item">
                 <div>
+                  <span>{{ $t("defaultSendMethod") }}</span>
+                </div>
+                <div>
+                  <el-select v-model="setting.sendMethod" @change="change" placeholder="Select" style="width: 160px">
+                    <el-option :value="'auto'" :label="$t('sendMethodAuto')" />
+                    <el-option :value="'resend'" :label="$t('sendMethodResend')" />
+                    <el-option :value="'smtp'" :label="$t('sendMethodSmtp')" />
+                  </el-select>
+                </div>
+              </div>
+              <div class="setting-item">
+                <div>
                   <span>{{ $t("noRecipientTitle") }}</span>
                   <el-tooltip effect="dark" :content="$t('noRecipientDesc')">
                     <Icon class="warning" icon="fe:warning" width="18" height="18" />

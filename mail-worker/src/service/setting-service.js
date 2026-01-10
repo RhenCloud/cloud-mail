@@ -15,6 +15,7 @@ const settingService = {
 		const settingRow = await orm(c).select().from(setting).get();
 		settingRow.resendTokens = JSON.parse(settingRow.resendTokens || '{}');
 		settingRow.smtpConfigs = JSON.parse(settingRow.smtpConfigs || '{}');
+		settingRow.sendMethod = settingRow.sendMethod || 'resend';
 		c.set('setting', settingRow);
 		await c.env.kv.put(KvConst.SETTING, JSON.stringify(settingRow));
 	},
@@ -130,6 +131,9 @@ const settingService = {
 
 		settingRow.storageType = await r2Service.storageType(c);
 
+		// ensure sendMethod exists
+		settingRow.sendMethod = settingRow.sendMethod || 'resend';
+
 		return settingRow;
 	},
 
@@ -151,6 +155,9 @@ const settingService = {
 
 		params.resendTokens = JSON.stringify(resendTokens);
 		params.smtpConfigs = JSON.stringify(smtpConfigs);
+		if (params.sendMethod === undefined && settingData.sendMethod) {
+			params.sendMethod = settingData.sendMethod;
+		}
 		await orm(c).update(setting).set({ ...params }).returning().get();
 		await this.refresh(c);
 	},
@@ -234,6 +241,7 @@ const settingService = {
 			linuxdoCallbackUrl: settingRow.linuxdoCallbackUrl,
 			linuxdoSwitch: settingRow.linuxdoSwitch,
 			minEmailPrefix: settingRow.minEmailPrefix
+			,sendMethod: settingRow.sendMethod
 		};
 	}
 };
