@@ -24,7 +24,28 @@ import domainUtils from '../utils/domain-uitls';
 import account from "../entity/account";
 
 // helper: ensure attachment content is base64 string when possible
-	async list(c, params, userId) {
+	const toBase64String = (content) => {
+		if (!content) return content;
+		if (typeof content === 'string') return content;
+		try {
+			if (typeof Buffer !== 'undefined' && Buffer.isBuffer(content)) {
+				return Buffer.from(content).toString('base64');
+			}
+		} catch (e) {}
+		try {
+			if (content instanceof Uint8Array) {
+				return Buffer.from(content).toString('base64');
+			}
+			if (content instanceof ArrayBuffer) {
+				return Buffer.from(new Uint8Array(content)).toString('base64');
+			}
+		} catch (e) {}
+		return content;
+	}
+
+	const emailService = {
+
+		async list(c, params, userId) {
 
 		let { emailId, type, accountId, size, timeSort, allReceive } = params;
 
