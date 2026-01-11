@@ -27,6 +27,7 @@ const init = {
 		await this.v2_5DB(c);
 		await this.v2_6DB(c);
 		await this.v2_7DB(c);
+		await this.v2_8DB(c);
 		await settingService.refresh(c);
 		return c.text(t('initSuccess'));
 	},
@@ -51,6 +52,21 @@ const init = {
 				c.env.db.prepare(`UPDATE setting SET smtp_configs = '{}' WHERE smtp_configs IS NULL OR smtp_configs = ''`),
 				c.env.db.prepare(`UPDATE setting SET send_method = 'resend' WHERE send_method IS NULL OR send_method = ''`)
 			]);
+		} catch (e) {
+			console.error(e.message)
+		}
+	},
+
+	async v2_8DB(c) {
+		// Ensure ahasend_configs column exists
+		try {
+			await c.env.db.prepare(`ALTER TABLE setting ADD COLUMN ahasend_configs TEXT NOT NULL DEFAULT '{}';`).run();
+		} catch (e) {
+			console.error(e.message)
+		}
+
+		try {
+			await c.env.db.prepare(`UPDATE setting SET ahasend_configs = '{}' WHERE ahasend_configs IS NULL OR ahasend_configs = ''`).run();
 		} catch (e) {
 			console.error(e.message)
 		}

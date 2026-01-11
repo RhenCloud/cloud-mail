@@ -75,58 +75,123 @@ const emailService = {
 			allReceive = accountRow.allReceive;
 		}
 
-		const query = orm(c)
-			.select({
-				...email,
-				starId: star.starId
-			})
-			.from(email)
-			.leftJoin(
-				star,
-				and(
-					eq(star.emailId, email.emailId),
-					eq(star.userId, userId)
-				)
-			).leftJoin(
-				account,
-				eq(account.accountId, email.accountId)
-			)
-			.where(
-				and(
-					allReceive ? eq(1,1) : eq(email.accountId, accountId),
-					eq(email.userId, userId),
-					timeSort ? gt(email.emailId, emailId) : lt(email.emailId, emailId),
-					eq(email.type, type),
-					eq(email.isDel, isDel.NORMAL),
-					eq(account.isDel, isDel.NORMAL)
-				)
-			);
+		} else if (useAha && ahaConfig) {
+			// 使用 AhaSend HTTP API 发送（配置样式：domain -> { apiKey, url? } 或直接 apiKey 字符串）
+			const ahaUrl = (ahaConfig && ahaConfig.url) || c.env.AHASEND_URL || 'https://api.ahasend.com/v1/emails';
+			const apiKey = typeof ahaConfig === 'string' ? ahaConfig : (ahaConfig.apiKey || ahaConfig.token);
+			if (!apiKey) {
+				throw new BizError(t('noAhaSendConfig'));
+			}
+			try {
+				if (manyType === 'divide') {
+					const results = [];
+					for (const rEmail of receiveEmail) {
+						const payload = {
+							from: `${name} <${accountRow.email}>`,
+							to: [rEmail],
+							subject,
+							text,
+							html,
+							attachments: [
+								...imageDataList.map(item => ({ filename: item.filename, content: toBase64String(item.content), type: item.mimeType || item.contentType })),
+								...attachments.map(att => ({ filename: att.filename, content: toBase64String(att.content), type: att.type }))
+							]
+						};
 
-		if (timeSort) {
-			query.orderBy(asc(email.emailId));
+						if (sendType === 'reply') {
+							payload.headers = { 'in-reply-to': emailRow.messageId, references: emailRow.messageId };
+						}
+
+						const res = await fetch(ahaUrl, {
+							method: 'POST',
+							headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+							body: JSON.stringify(payload)
+						});
+						const json = await res.json().catch(() => ({}));
+						results.push({ id: json.id || uuidv4() });
+					}
+					resendResult = { data: { data: results } };
+				} else {
+					const payload = {
+						from: `${name} <${accountRow.email}>`,
+						to: receiveEmail.length === 1 ? receiveEmail[0] : receiveEmail,
+						subject,
+						text,
+						html,
+						attachments: [
+							...imageDataList.map(item => ({ filename: item.filename, content: toBase64String(item.content), type: item.mimeType || item.contentType })),
+							...attachments.map(att => ({ filename: att.filename, content: toBase64String(att.content), type: att.type }))
+						]
+					};
+
+					if (sendType === 'reply') {
+						payload.headers = { 'in-reply-to': emailRow.messageId, references: emailRow.messageId };
+					}
+
+					const res = await fetch(ahaUrl, {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+						body: JSON.stringify(payload)
+					});
+					const json = await res.json().catch(() => ({}));
+					resendResult = { data: { id: json.id || uuidv4() } };
+				}
+			} catch (e) {
+				console.error('[AhaSend Error]', e && e.message);
+				throw new BizError(e.message || 'ahasend send error');
+			}
 		} else {
-			query.orderBy(desc(email.emailId));
-		}
+			const resend = new Resend(resendToken);
 
-		const listQuery = query.limit(size).all();
 
-		const totalQuery = orm(c).select({ total: count() }).from(email)
-			.leftJoin(
-				account,
-				eq(account.accountId, email.accountId)
-			)
-			.where(
-				and(
-					allReceive ? eq(1,1) : eq(email.accountId, accountId),
-					eq(email.userId, userId),
-					eq(email.type, type),
-					eq(email.isDel, isDel.NORMAL),
-					eq(account.isDel, isDel.NORMAL)
-				)
-		).get();
+				//如果是分开发送
+				if (manyType === 'divide') {
 
-		const latestEmailQuery = orm(c).select().from(email).where(
-			and(
+					let sendFormList = [];
+
+					receiveEmail.forEach(email => {
+						const sendForm = {
+							from: `${name} <${accountRow.email}>`,
+							to: [email],
+							subject: subject,
+							text: text,
+							html: html
+						};
+
+						if (sendType === 'reply') {
+							sendForm.headers = {
+								'in-reply-to': emailRow.messageId,
+								'references': emailRow.messageId
+							};
+						}
+
+						sendFormList.push(sendForm);
+					});
+
+					resendResult = await resend.batch.send(sendFormList);
+
+				} else {
+
+					const sendForm = {
+						from: `${name} <${accountRow.email}>`,
+						to: [...receiveEmail],
+						subject: subject,
+						text: text,
+						html: html,
+						attachments: [...imageDataList, ...attachments]
+					};
+
+					if (sendType === 'reply') {
+						sendForm.headers = {
+							'in-reply-to': emailRow.messageId,
+							'references': emailRow.messageId
+						};
+					}
+
+					resendResult = await resend.emails.send(sendForm);
+
+				}
+			}
 				allReceive ? eq(1,1) : eq(email.accountId, accountId),
 				eq(email.userId, userId),
 				eq(email.type, type),
@@ -191,7 +256,7 @@ const emailService = {
 			attachments
 		} = params;
 
-		const { resendTokens, r2Domain, send, smtpConfigs: settingSmtpConfigs, sendMethod } = await settingService.query(c);
+		const { resendTokens, r2Domain, send, smtpConfigs: settingSmtpConfigs, ahasendConfigs: settingAhasendConfigs, sendMethod } = await settingService.query(c);
 
 		let { imageDataList, html } = await attService.toImageUrlHtml(c, content);
 
@@ -286,16 +351,36 @@ const emailService = {
 
 		const smtpConfig = smtpConfigs[domain];
 
+		// check ahasend configs
+		let ahasendConfigs = settingAhasendConfigs || {};
+		if (!ahasendConfigs || Object.keys(ahasendConfigs).length === 0) {
+			const ahaEnv = c.env.AHASEND_CONFIG || c.env.ahasendConfigs;
+			if (ahaEnv) {
+				try {
+					ahasendConfigs = typeof ahaEnv === 'string' ? JSON.parse(ahaEnv) : ahaEnv;
+				} catch (e) {
+					ahasendConfigs = {};
+				}
+			}
+		}
+
+		const ahaConfig = ahasendConfigs[domain];
+
 		// 决定使用哪种发送方式：优先级由 sendMethod 决定
-		// sendMethod: 'smtp' | 'resend' | 'auto'
+		// sendMethod: 'smtp' | 'resend' | 'auto' | 'ahasend'
 		let useSmtp = false;
+		let useAha = false;
 		if (sendMethod === 'smtp') {
 			useSmtp = !!smtpConfig;
 		} else if (sendMethod === 'resend') {
 			useSmtp = false;
+			useAha = false;
+		} else if (sendMethod === 'ahasend') {
+			useAha = !!ahaConfig;
 		} else {
 			// auto or undefined: prefer smtp when available
 			useSmtp = !!smtpConfig;
+			if (!useSmtp) useAha = !!ahaConfig;
 		}
 
 		if (useSmtp && smtpConfig) {

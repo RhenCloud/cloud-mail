@@ -15,6 +15,7 @@ const settingService = {
 		const settingRow = await orm(c).select().from(setting).get();
 		settingRow.resendTokens = JSON.parse(settingRow.resendTokens || '{}');
 		settingRow.smtpConfigs = JSON.parse(settingRow.smtpConfigs || '{}');
+		settingRow.ahasendConfigs = JSON.parse(settingRow.ahasendConfigs || '{}');
 		settingRow.sendMethod = settingRow.sendMethod || 'resend';
 		c.set('setting', settingRow);
 		await c.env.kv.put(KvConst.SETTING, JSON.stringify(settingRow));
@@ -62,18 +63,24 @@ const settingService = {
 
 		setting.emailPrefixFilter = setting.emailPrefixFilter.split(",").filter(Boolean);
 
-		// ensure objects
-		try {
-			setting.resendTokens = typeof setting.resendTokens === 'string' ? JSON.parse(setting.resendTokens) : (setting.resendTokens || {});
-		} catch (e) {
-			setting.resendTokens = {};
-		}
+			// ensure objects
+			try {
+				setting.resendTokens = typeof setting.resendTokens === 'string' ? JSON.parse(setting.resendTokens) : (setting.resendTokens || {});
+			} catch (e) {
+				setting.resendTokens = {};
+			}
 
-		try {
-			setting.smtpConfigs = typeof setting.smtpConfigs === 'string' ? JSON.parse(setting.smtpConfigs) : (setting.smtpConfigs || {});
-		} catch (e) {
-			setting.smtpConfigs = {};
-		}
+			try {
+				setting.smtpConfigs = typeof setting.smtpConfigs === 'string' ? JSON.parse(setting.smtpConfigs) : (setting.smtpConfigs || {});
+			} catch (e) {
+				setting.smtpConfigs = {};
+			}
+
+			try {
+				setting.ahasendConfigs = typeof setting.ahasendConfigs === 'string' ? JSON.parse(setting.ahasendConfigs) : (setting.ahasendConfigs || {});
+			} catch (e) {
+				setting.ahasendConfigs = {};
+			}
 
 		c.set?.('setting', setting);
 		return setting;
@@ -107,6 +114,17 @@ const settingService = {
 					username: u ? `${u.slice(0, 4)}******` : '',
 					password: p ? `${p.slice(0, 4)}******` : ''
 				}
+			}
+		});
+
+		// mask ahasend api keys
+		Object.keys(settingRow.ahasendConfigs || {}).forEach(key => {
+			const cfg = settingRow.ahasendConfigs[key];
+			if (!cfg) return;
+			if (typeof cfg === 'string') {
+				settingRow.ahasendConfigs[key] = `${cfg.slice(0, 12)}******`;
+			} else if (cfg.apiKey) {
+				settingRow.ahasendConfigs[key] = { ...cfg, apiKey: `${String(cfg.apiKey).slice(0, 12)}******` };
 			}
 		});
 
@@ -149,12 +167,18 @@ const settingService = {
 			if (!smtpConfigs[domain]) delete smtpConfigs[domain];
 		});
 
+		let ahasendConfigs = { ...settingData.ahasendConfigs, ...params.ahasendConfigs };
+		Object.keys(ahasendConfigs).forEach(domain => {
+			if (!ahasendConfigs[domain]) delete ahasendConfigs[domain];
+		});
+
 		if (Array.isArray(params.emailPrefixFilter)) {
 			params.emailPrefixFilter = params.emailPrefixFilter + '';
 		}
 
 		params.resendTokens = JSON.stringify(resendTokens);
 		params.smtpConfigs = JSON.stringify(smtpConfigs);
+		params.ahasendConfigs = JSON.stringify(ahasendConfigs);
 		if (params.sendMethod === undefined && settingData.sendMethod) {
 			params.sendMethod = settingData.sendMethod;
 		}

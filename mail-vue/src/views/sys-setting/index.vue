@@ -223,6 +223,7 @@
                     <el-option :value="'auto'" :label="$t('sendMethodAuto')" />
                     <el-option :value="'resend'" :label="$t('sendMethodResend')" />
                     <el-option :value="'smtp'" :label="$t('sendMethodSmtp')" />
+                    <el-option :value="'ahasend'" :label="'AhaSend'" />
                   </el-select>
                 </div>
               </div>
@@ -277,6 +278,19 @@
                     <Icon icon="ic:round-list" width="18" height="18" />
                   </el-button>
                   <el-button class="opt-button" style="margin-top: 0" @click="openSmtpForm" size="small" type="primary">
+                    <Icon icon="material-symbols:add-rounded" width="16" height="16" />
+                  </el-button>
+                </div>
+              </div>
+              <div class="setting-item">
+                <div>
+                  <span>AhaSend {{ $t("configuration") }}</span>
+                </div>
+                <div>
+                  <el-button class="opt-button" style="margin-top: 0" @click="openAhaList" size="small" type="primary">
+                    <Icon icon="ic:round-list" width="18" height="18" />
+                  </el-button>
+                  <el-button class="opt-button" style="margin-top: 0" @click="openAhaForm" size="small" type="primary">
                     <Icon icon="material-symbols:add-rounded" width="16" height="16" />
                   </el-button>
                 </div>
@@ -568,6 +582,17 @@
         </form>
       </el-dialog>
 
+      <el-dialog v-model="ahaFormShow" :title="'AhaSend ' + $t('configuration')" width="520" @closed="cleanAhaForm">
+        <form>
+          <el-input style="margin-bottom: 10px" v-model="ahasendForm.domain" placeholder="Domain" />
+          <el-input style="margin-bottom: 10px" v-model="ahasendForm.apiKey" placeholder="API Key" />
+          <el-input style="margin-bottom: 10px" v-model="ahasendForm.url" placeholder="API URL (optional)" />
+          <div style="display: flex; gap: 8px; justify-content: flex-end">
+            <el-button type="primary" :loading="settingLoading" @click="saveAha">{{ $t("save") }}</el-button>
+          </div>
+        </form>
+      </el-dialog>
+
       <el-dialog class="resend-table" v-model="showSmtpList" :title="'SMTP ' + $t('configuration')">
         <el-table :data="smtpList">
           <el-table-column property="domain" :label="$t('domain')" />
@@ -577,6 +602,19 @@
             <template #default="{ row }">
               <el-button size="small" @click="editSmtp(row)">{{ $t("edit") }}</el-button>
               <el-button size="small" type="danger" @click="deleteSmtp(row)">{{ $t("delete") }}</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </el-dialog>
+
+      <el-dialog class="resend-table" v-model="showAhaList" :title="'AhaSend ' + $t('configuration')">
+        <el-table :data="ahaList">
+          <el-table-column property="domain" :label="$t('domain')" />
+          <el-table-column property="value" :label="$t('token')" />
+          <el-table-column fixed="right" width="180">
+            <template #default="{ row }">
+              <el-button size="small" @click="editAha(row)">{{ $t("edit") }}</el-button>
+              <el-button size="small" type="danger" @click="deleteAha(row)">{{ $t("delete") }}</el-button>
             </template>
           </el-table-column>
         </el-table>
@@ -1012,6 +1050,14 @@ const smtpForm = reactive({
     username: "",
     password: "",
   },
+});
+const ahaFormShow = ref(false);
+const showAhaList = ref(false);
+const ahaList = ref([]);
+const ahasendForm = reactive({
+  domain: "",
+  apiKey: "",
+  url: "",
 });
 const turnstileForm = reactive({
   siteKey: "",
@@ -1553,6 +1599,60 @@ function deleteSmtp(row) {
   const domain = row.domain;
   const settingForm = { smtpConfigs: {} };
   settingForm.smtpConfigs[domain] = null;
+  editSetting(settingForm);
+}
+
+function cleanAhaForm() {
+  ahasendForm.domain = "";
+  ahasendForm.apiKey = "";
+  ahasendForm.url = "";
+}
+
+function saveAha() {
+  if (!ahasendForm.domain) {
+    ElMessage({ message: "Domain is required", type: "error", plain: true });
+    return;
+  }
+
+  const domain = ahasendForm.domain.replace(/^@/, "").trim();
+  const cfg = {
+    apiKey: ahasendForm.apiKey,
+    url: ahasendForm.url || undefined,
+  };
+
+  const settingForm = { ahasendConfigs: {} };
+  settingForm.ahasendConfigs[domain] = cfg;
+  editSetting(settingForm);
+}
+
+function openAhaList() {
+  const list = Object.keys(setting.value.ahasendConfigs || {}).map((key) => ({
+    domain: key,
+    value: setting.value.ahasendConfigs[key],
+  }));
+  ahaList.value = list;
+  showAhaList.value = true;
+}
+
+function openAhaForm() {
+  ahasendForm.domain = "";
+  ahasendForm.apiKey = "";
+  ahasendForm.url = "";
+  ahaFormShow.value = true;
+}
+
+function editAha(row) {
+  ahasendForm.domain = row.domain || row.key;
+  const cfg = setting.value.ahasendConfigs[ahasendForm.domain] || {};
+  ahasendForm.apiKey = cfg.apiKey || cfg.token || "";
+  ahasendForm.url = cfg.url || "";
+  ahaFormShow.value = true;
+}
+
+function deleteAha(row) {
+  const domain = row.domain || row.key;
+  const settingForm = { ahasendConfigs: {} };
+  settingForm.ahasendConfigs[domain] = null;
   editSetting(settingForm);
 }
 
